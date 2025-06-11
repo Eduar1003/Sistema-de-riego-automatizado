@@ -1,4 +1,4 @@
-Mini proyecto poniendo en práctica mis conocimientos en programación y en el lenguaje C++ con Arduino
+Mini proyecto poniendo en práctica mis conocimientos en programación y en el lenguaje C++ con Arduino/n
 SISTEMA DE RIEGO AUTOMÁTICO
 El sistema consta de:
 1 Arduino
