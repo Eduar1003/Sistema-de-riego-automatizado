@@ -1,5 +1,7 @@
-Mini proyecto poniendo en práctica mis conocimientos en programación y en el lenguaje C++ con Arduino/n
+Mini proyecto poniendo en práctica mis conocimientos en programación y en el lenguaje C++ con Arduino
+
 SISTEMA DE RIEGO AUTOMÁTICO
+
 El sistema consta de:
 1 Arduino
 1 Sensor de humedad YL-69
