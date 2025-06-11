@@ -67,6 +67,7 @@ struct CropParameters {
     float minTemp;
     float maxTemp;
     float minHumidity;
+    float maxHumidity;
 };
 
 CropParameters cropParameters; // Variable para almacenar los parámetros del cultivo
@@ -259,36 +260,43 @@ void selectCrop()
   }
 }
 
+// Agrega los parámetros del cultivo seleccionado
+
 void addCropParameters(byte option) {
   switch (option) {
     case 1: // Cilantro
-    cropParameters.minTemp = 3.0;
-    cropParameters.maxTemp = 12.0;
-    cropParameters.minHumidity = 4.0;
+    cropParameters.minTemp = 15.0;
+    cropParameters.maxTemp = 24.0;
+    cropParameters.minHumidity = 40.0;
+    cropParameters.maxHumidity = 50.0;
     break;
 
     case 2: // Fresa
-    cropParameters.minTemp = 10.0;
-    cropParameters.maxTemp = 25.0;
-    cropParameters.minHumidity = 35.0;
+    cropParameters.minTemp = 15.0;
+    cropParameters.maxTemp = 20.0;
+    cropParameters.minHumidity = 60.0;
+    cropParameters.maxHumidity = 80.0;
     break;
 
     // case 3: // Arroz
     // cropParameters.minTemp = 10.0;
     // cropParameters.maxTemp = 25.0;
     // cropParameters.minHumidity = 10.0;
+    // cropParameters.maxHumidity = 100.0;
     // break;
 
     // case 4: // Tomate
     // cropParameters.minTemp = 10.0;
     // cropParameters.maxTemp = 25.0;
     // cropParameters.minHumidity = 10.0;
+    // cropParameters.maxHumidity = 100.0;
     // break;
 
     // case 5: // Zanahoria
     // cropParameters.minTemp = 15.0;
     // cropParameters.maxTemp = 35.0;
     // cropParameters.minHumidity = 35.0;
+    // cropParameters.maxHumidity = 100.0;
     // break;
 
     default:
@@ -327,7 +335,10 @@ bool receiveRange(float tmp ,float hum)
     return false; // Valores inválidos de los sensores
   }
 
-  if ((tmp >= cropParameters.minTemp && tmp <= cropParameters.maxTemp) && hum <= cropParameters.minHumidity)
+  if ((tmp >= cropParameters.minTemp && tmp <= cropParameters.maxTemp) && (hum <= cropParameters.minHumidity))
+    return true;
+
+  else if ((tmp >= cropParameters.minTemp && tmp <= cropParameters.maxTemp) && (hum <= cropParameters.maxHumidity))
     return true;
 
   else
