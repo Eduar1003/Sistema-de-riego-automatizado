@@ -1,8 +1,11 @@
 Mini proyecto poniendo en práctica mis conocimientos en programación y en el lenguaje C++ con Arduino
 
+SISTEMA DE RIEGO AUTOMÁTICO
+
 El sistema consta de:
 1 Arduino
-1 Sensor de temperatura
+1 Sensor de humedad YL-69
+1 Sensor de temperatura TMP 36
 1 Motor que simula el actuador de riego
 1 Display LCD 16 X 2
 1 Teclado matricial 4 x 4
