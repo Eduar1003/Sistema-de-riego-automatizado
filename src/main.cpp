@@ -16,9 +16,13 @@
 
 // Pines digitales para actuadores
 #define IRRIGATION_MOTOR A2 // Pin para controlar el motor/rele de riego
-#define DELAY_150_MS 150   // Delay de 150 ms
+#define DELAY_150_MS 150   // Delay de 150 ms para respuesta del teclado
 #define DELAY_1_SEG 1000   // Delay estándar de 1 segundo (en ms)
 #define DELAY_2_SEG 2000   // Delay largo de 2 segundos (en ms)
+
+#define TEMP_CALIBRATION_OFFSET -50 // Ajuste de calibración para el sensor TMP36
+#define ADC_MAX_VALUE 1023 // Valor máximo del ADC
+#define VCC 5.0 // Voltaje de alimentación
 
 // Configuración del teclado matricial 4x4
 #define ROWS 4 // Número de filas del teclado
@@ -34,8 +38,8 @@ struct SensorData {
   float humidity;
   
   void update() {
-      temperature = ((analogRead(TMP_SENSOR) * 5.0 / 1023.0) * 100.0) - 50;
-      humidity = (analogRead(HUM_SENSOR) * 5.0 / 1023.0) * 100.0;
+      temperature = ((analogRead(TMP_SENSOR) * VCC / ADC_MAX_VALUE) * 100.0) + TEMP_CALIBRATION_OFFSET;
+      humidity = (analogRead(HUM_SENSOR) * VCC / ADC_MAX_VALUE) * 100.0;
   }
 };
 
@@ -108,28 +112,67 @@ byte colPins[COLS] = {9, 8, 7, 6};
 // Creación del teclado matricial
 Keypad key = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-// Función para mostrar mensajes en la pantalla LCD
-// Parámetros:
-// - message1: Texto para la primera línea (16 caracteres max)
-// - message2: Texto para la segunda línea (opcional)
-// - row1: Número de fila para message1 (0 o 1)
-// - row2: Número de fila para message2 (0 o 1)
-// Efectos:
-// - Limpia la pantalla
-// - Muestra los mensajes en las posiciones especificadas
-// - Añade un pequeño delay para legibilidad
-void showSelectionMessage(String message1, String message2 = "", byte row1 = 0, byte row2 = 1)
-{
-  lcd.clear();
-  lcd.setCursor(0, row1);
-  lcd.print(message1);
-  lcd.setCursor(0, row2);
-  lcd.print(message2);
+// ======== PROTOTIPOS DE FUNCIONES ========
+void initLCD();
+void showSelectionMessage(String, String = "", byte = 0, byte = 1);
+void showMenu();
+bool isValidCropSelection(byte);
+void processCropSelection(byte);
+void selectCrop();
+void addCropParameters(byte);
+float readTemperature();
+float readHumidity();
+void printData();
+bool receiveRange(float, float);
+void controlIrrigation(bool);
 
-  delay(DELAY_150_MS);
+// ======== CONFIGURACIÓN INICIAL ========
+void setup() {
+
+  // Configuración de pines
+  pinMode(TMP_SENSOR, INPUT); // Configuración del pin del sensor de temperatura como entrada
+  pinMode(HUM_SENSOR, INPUT); // Configuración del pin del sensor de humedad como entrada
+  pinMode(IRRIGATION_MOTOR, OUTPUT); // Configuración del pin del motor de riego como salida
+
+  // Llamada a la función initLCD
+  initLCD();
+
+  // Se pregunta al usuario por el cultivo a regar mostrando un menú
+  showMenu();
+
+  // Mientras no se presione una tecla seguimos esperando mostrando un mensaje de seleccionar un cultivo
+  // Y no se puede avanzar hasta que se selecciona un cultivo válido
+  
+  do {
+    // Se llama a la función selectCrop para seleccionar el cultivo
+    selectCrop();
+
+  } while (systemState.cropValid == false);
+
+  // Enviamos el parámetro seleccionado por el usuario
+  addCropParameters(systemState.selectedCrop);
+
 }
 
-// Inicialización de la pantalla lcd
+// ======== BUCLE PRINCIPAL ========
+void loop() {
+
+  systemState.sensorReadings.update(); // Se actualizan los datos del sensor
+
+  // Se recibe el rango de la temperatura y la humedad, si es true se enciende el motor de riego de lo contrario se apaga
+  systemState.motorActive = receiveRange(systemState.sensorReadings.temperature, systemState.sensorReadings.humidity);
+
+  // Impresión de los datos leídos en la pantalla lcd
+  printData();
+
+  // Se activa el motor de riego si se cumple la condición de la función receiveRange
+  controlIrrigation(systemState.motorActive);
+
+  delay(DELAY_1_SEG); // Delay de 1 segundo antes de hacer la siguiente lectura
+}
+
+// ======== FUNCIONES DE HARDWARE ========
+// --- LCD ---
 void initLCD()
 {
   lcd.begin(16, 2);
@@ -141,10 +184,22 @@ void initLCD()
   lcd.clear();
 }
 
-// Función para recorrer la lista de cultivos
+void showSelectionMessage(String message1, String message2, byte row1, byte row2)
+{
+  lcd.clear();
+  lcd.setCursor(0, row1);
+  lcd.print(message1);
+  lcd.setCursor(0, row2);
+  lcd.print(message2);
+
+  delay(DELAY_150_MS);
+}
+
+// ======== FUNCIONES DE LÓGICA ========
+// --- Menú y selección ---
 void showMenu() {
 
-  showSelectionMessage("Seleccione un", "cultivo valido");
+  showSelectionMessage("Seleccione un", "cultivo");
   delay(DELAY_2_SEG);
 
   for (byte i = 0; i < sizeCropList; i++) {
@@ -155,18 +210,11 @@ void showMenu() {
   }
 }
 
-// Función de validación si el cultivo seleccionado se encuentra en el rango de cultivos
-// Parámetros:
-// - selection: Número de cultivo seleccionado
-// Retorna:
-// - true: Si la selección está dentro del rango válido
-// - false: Si la selección es inválida
 bool isValidCropSelection(byte selection)
 {
   return (selection >= 1 && selection <= sizeCropList); 
 }
 
-// Función para procesar la selección del cultivo
 void processCropSelection(byte selection)
 {
     byte index = selection - 1;
@@ -182,7 +230,6 @@ void processCropSelection(byte selection)
     systemState.cropValid = true;
 }
 
-// Función para seleccionar el cultivo
 void selectCrop()
 {
   // Variable para almacenar la elección del usuario
@@ -212,13 +259,7 @@ void selectCrop()
   }
 }
 
-// Se crea una función para asignar el cultivo que el usuario seleccionó
-// Parámetros:
-// - option: Número de cultivo que va desde el 1 hasta el tamaño de la lista de cultivos que puede variar
-// Efectos:
-// - Actualiza cropParameters con los valores óptimos para el cultivo
-// - Los valores incluyen rangos de temperatura y humedad ideal
-void selectCrop(byte option) {
+void addCropParameters(byte option) {
   switch (option) {
     case 1: // Cilantro
     cropParameters.minTemp = 3.0;
@@ -255,25 +296,37 @@ void selectCrop(byte option) {
   } 
 }
 
-// Función para leer la temperatura
+// ======== FUNCIONES DE SENSORES ========
 float readTemperature() {
     return ((analogRead(TMP_SENSOR) * 5.0 / 1023.0) * 100.0) - 50; // Restándole 50 al resultado para coincidir en Tinkercad
 }
 
-// Función para leer la humedad
 float readHumidity() {
     return (analogRead(HUM_SENSOR) * 5.0 / 1023.0) * 100.0;
 }
 
-// Función para imprimir los datos leídos
 void printData()
 {
   showSelectionMessage("Temp: " + (String(systemState.sensorReadings.temperature) + " C"), "Humedad: " + (String(systemState.sensorReadings.humidity) + " %"));
 }
 
-// Función para recibir el rango de la temperatura y la humedad y así controlar el motor de riego
+// ======== FUNCIONES DE CONTROL ========
 bool receiveRange(float tmp ,float hum)
 {
+  if (tmp < -20 || tmp > 100)
+  {
+    showSelectionMessage("Rango de", "temp invalida");
+    delay(DELAY_2_SEG);
+    return false; // Valores inválidos de los sensores
+  }
+
+  if (hum < 0 || hum > 100)
+  {
+    showSelectionMessage("Rango de", "humedad invalida");
+    delay(DELAY_2_SEG);
+    return false; // Valores inválidos de los sensores
+  }
+
   if ((tmp >= cropParameters.minTemp && tmp <= cropParameters.maxTemp) && hum <= cropParameters.minHumidity)
     return true;
 
@@ -281,64 +334,11 @@ bool receiveRange(float tmp ,float hum)
     return false;
 }
 
-// Función para activar el motor de riego si se cumple la condición
-void controlIrrigation(bool turn_on)
+void controlIrrigation(bool shouldActivateMotor)
 {
-  if (turn_on == true)
+  if (shouldActivateMotor == true)
     digitalWrite(IRRIGATION_MOTOR, HIGH);
 
   else
     digitalWrite(IRRIGATION_MOTOR, LOW);
-}
-
-void setup() {
-
-  // Configuración de pines
-  pinMode(TMP_SENSOR, INPUT); // Configuración del pin del sensor de temperatura como entrada
-  pinMode(HUM_SENSOR, INPUT); // Configuración del pin del sensor de humedad como entrada
-  pinMode(IRRIGATION_MOTOR, OUTPUT); // Configuración del pin del motor de riego como salida
-
-  // Llamada a la función initLCD
-  initLCD();
-
-  // Se pregunta al usuario por el cultivo a regar mostrando un menú
-  showMenu();
-
-  // Mientras no se presione una tecla seguimos esperando mostrando un mensaje de seleccionar un cultivo
-  // Y no se puede avanzar hasta que se selecciona un cultivo válido
-  
-  do {
-    // Se llama a la función selectCrop para seleccionar el cultivo
-    selectCrop();
-
-  } while (systemState.cropValid == false);
-
-  // Enviamos el parámetro seleccionado por el usuario
-  selectCrop(systemState.selectedCrop);
-
-}
-
-// ========= BUCLE LOOP =========
-// Función principal de control de riego
-// Lógica:
-// 1. Lee valores actuales de sensores
-// 2. Verifica si están fuera de rangos óptimos
-// 3. Muestra datos en pantalla
-// 4. Activa/desactiva el riego según sea necesario
-// Se ejecuta en loop continuo con delay de 1 segundo
-
-void loop() {
-
-  systemState.sensorReadings.update(); // Se actualizan los datos del sensor
-
-  // Se recibe el rango de la temperatura y la humedad, si es true se enciende el motor de riego de lo contrario se apaga
-  systemState.motorActive = receiveRange(systemState.sensorReadings.temperature, systemState.sensorReadings.humidity);
-
-  // Impresión de los datos leídos en la pantalla lcd
-  printData();
-
-  // Se activa el motor de riego si se cumple la condición de la función receiveRange
-  controlIrrigation(systemState.motorActive);
-
-  delay(DELAY_1_SEG); // Delay de 1 segundo antes de hacer la siguiente lectura
 }
