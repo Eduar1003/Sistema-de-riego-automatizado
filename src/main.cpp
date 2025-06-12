@@ -63,6 +63,8 @@ SystemState systemState; // Variable para almacenar el estado del sistema
 // - minTemp: Temperatura mínima recomendada (°C)
 // - maxTemp: Temperatura máxima recomendada (°C)
 // - minHumidity: Humedad mínima del suelo (%)
+// - maxHumidity: Humedad máxima del suelo (%)
+// Estos parámetros se utilizan para determinar cuándo activar el riego
 struct CropParameters {
     float minTemp;
     float maxTemp;
@@ -83,13 +85,13 @@ struct keyValue {
 keyValue cropList [] = {
   {"Cilantro", 0},
   {"Fresa", 1},
-  // {"Arroz", 2},
+  // {"Arroz", 2}, // Descomentando estas líneas se puede agregar más cultivos
   // {"Tomate", 3},
   // {"Zanahoria", 4}
 };
 
 // Se obtiene el tamaño de la lista de cultivos dividiendo el tamaño total del array cropList entre el tamaño del struct keyValue
-byte sizeCropList = sizeof(cropList) / sizeof(cropList[1]);
+byte sizeCropList = sizeof(cropList) / sizeof(cropList[0]);
 
 // FIN ASIGNACIÓN DE VARIABLES
 
@@ -244,11 +246,19 @@ void selectCrop()
     systemState.selectedCrop = (option - '0'); // Se resta el valor ASCII de '0' para obtener el valor numérico de la tecla presionada
     if (option != NO_KEY)
     {
-      byte selection = option - '0';
-      if (isValidCropSelection(selection))
+    // Si se presiona una tecla y es un dígito, se verifica si es una selección válida
+    // Si no es una selección válida, se muestra un mensaje de selección inválida
+    // Si se presiona una tecla y no es un dígito, se ignora la tecla
+
+      if (isValidCropSelection(systemState.selectedCrop))
       {
-        processCropSelection(selection);
-        return;
+        addCropParameters(systemState.selectedCrop); // Se agregan los parámetros del cultivo seleccionado
+        systemState.cropValid = true; // Se marca el cultivo como válido
+        if (isValidCropSelection(systemState.selectedCrop))
+        {
+          processCropSelection(systemState.selectedCrop); // Procesa la selección del cultivo
+          return;
+        }
       }
       else
       {
@@ -277,6 +287,9 @@ void addCropParameters(byte option) {
     cropParameters.minHumidity = 60.0;
     cropParameters.maxHumidity = 80.0;
     break;
+
+    // Descomentando estas líneas se pueden agregar más cultivos con sus respectivos parámetros
+    // Debe corresponder con el índice del cropList
 
     // case 3: // Arroz
     // cropParameters.minTemp = 10.0;
